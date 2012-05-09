@@ -32,9 +32,6 @@ module Acts
 
       # This requires a numeric primary key for the legacy tables
       def import_all_in_batches
-        #each do |legacy_model|
-          #legacy_model.import
-        #end
         if GC.respond_to?(:copy_on_write_friendly=)
           GC.copy_on_write_friendly = true
         end
@@ -42,10 +39,7 @@ module Acts
         jobs_per_process = 2000
         process_count = 4
 
-        i = 0
         find_in_batches(:batch_size => jobs_per_process * process_count) do |group|
-          i += 1
-          puts "Processing group #{i}"
           batches = group.in_groups(process_count)
 
           threads = batches.map do |batch|
