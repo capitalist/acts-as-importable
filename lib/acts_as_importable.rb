@@ -32,8 +32,34 @@ module Acts
 
       # This requires a numeric primary key for the legacy tables
       def import_all_in_batches
-        each do |legacy_model|
-          legacy_model.import
+        #each do |legacy_model|
+          #legacy_model.import
+        #end
+        if GC.respond_to?(:copy_on_write_friendly=)
+          GC.copy_on_write_friendly = true
+        end
+
+        jobs_per_process = 2000
+        process_count = 4
+
+        i = 0
+        find_in_batches(:batch_size => jobs_per_process * process_count) do |group|
+          i += 1
+          puts "Processing group #{i}"
+          batches = group.in_groups(process_count)
+
+          threads = batches.map do |batch|
+            #Process.fork do
+            Thread.fork do
+              #ActiveRecord::Base.establish_connection
+
+              # Do the actual work
+              batch.compact.each {|legacy_model| legacy_model.import unless legacy_model.nil? }
+            end
+          end
+
+          #Process.waitall
+          threads.each &:join
         end
       end
 
@@ -57,7 +83,7 @@ module Acts
     module InstanceMethods
 
       def import
-        returning to_model do |new_model|
+        to_model.tap do |new_model|
           if new_model
             new_model.legacy_id     = self.id         if new_model.respond_to?(:"legacy_id=")
             new_model.legacy_class  = self.class.to_s if new_model.respond_to?(:"legacy_class=")
